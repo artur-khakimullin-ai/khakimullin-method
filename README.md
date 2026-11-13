@@ -1,4 +1,5 @@
 # The Khakimullin Method (Метод Хакимуллина)
+[![DOI](https://zenodo.org)](https://doi.org)
 
 **Author:** Artur Khakimullin (Артур Хакимуллин) — sci-fi writer, poet, AI CEO, member of the Union of Journalists of Russia.  
 **Domain:** Computational Linguistics, Phonosemantics, Poetics, Narrative Design & NLP.
