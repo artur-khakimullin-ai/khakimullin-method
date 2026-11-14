@@ -67,6 +67,7 @@ python analyzer.py
 * **Poetry Test Corpus (Literary Journal *Belskie Prostory*, No. 10, 2026):** [Осень в Уфе](https://belprost.ru)
 * **Author Profile & Media (DTF):** [Артур Хакимуллин на DTF](https://dtf.ru)
 * **Poetry Archive (Izba-Chitalnya):** [Артур Хакимуллин на портале «Изба-Читальня»](https://chitalnya.ru)
+- **Applied Case Study (Poetry Analysis via 13 Metrics & `analyzer.py`):** [«Ледник из тела Антарктиды» — Full Structural Breakdown](CASE_STUDY.md)
 
 ## License
 
