@@ -1,256 +1,114 @@
-import re
 import math
+import re
 from collections import Counter
 
-VOWELS = set("аеёиоуыэюя")
-CONSONANTS = set("бвгджзйклмнпрстфхцчшщ")
-SONORANTS = set("лмнрй")
-EXPLOSIVES_HISSING = set("бпдтгкжшщчц")
+VOWELS = set("аеёиоуыэюяАЕЁИОУЫЭЮЯaeiouyAEIOUY")
+CONSONANTS = set("бвгджзйклмнпрстфхцчшщБВГДЖЗЙКЛМНПРСТФХЦЧШЩbcdfghjklmnpqrstvwxzBCDFGHJKLMNPQRSTVWXZ")
 
-STOPWORDS = {
-    "и", "в", "во", "не", "что", "он", "на", "я", "с", "со", "как", "а", "то",
-    "все", "она", "так", "его", "но", "да", "ты", "к", "у", "же", "вы", "за",
-    "бы", "по", "только", "ее", "мне", "было", "вот", "от", "меня", "еще", "нет",
-    "о", "из", "ему", "теперь", "когда", "даже", "ну", "вдруг", "ли", "если", "уже"
-}
+# Базовый словарь распространенных поэтических штампов и канцеляризмов
+CLICHE_PATTERNS = [
+    r"любов[ьи]\s*[-—]?\s*кров[ьи]",
+    r"душ[аеу]\s*[-—]?\s*тишин[аеу]",
+    r"осенн(ий|яя|ее|ие)\s+(ветер|дождь|грусть|печаль)",
+    r"холодн(ый|ая|ое|ые)\s+(ветер|дождь|взгляд|сердце)",
+    r"разбит(ое|ым|ом)\s+сердц(е|ем|а)",
+    r"слез[аы]\s+на\s+глазах",
+    r"в\s+рамках\s+данного",
+    r"на\s+сегодняшний\s+день",
+    r"играет\s+важную\s+роль"
+]
 
+def tokenize(text: str):
+    return re.findall(r"[а-яА-ЯёЁa-zA-Z]+(?:-[а-яА-ЯёЁa-zA-Z]+)*", text.lower())
 
-def levenshtein(s1: str, s2: str) -> int:
-    """Расстояние Левенштейна для поиска паронимической аттракции."""
-    if len(s1) < len(s2):
-        return levenshtein(s2, s1)
-    if len(s2) == 0:
-        return len(s1)
-    previous_row = range(len(s2) + 1)
-    for i, c1 in enumerate(s1):
-        current_row = [i + 1]
-        for j, c2 in enumerate(s2):
-            insertions = previous_row[j + 1] + 1
-            deletions = current_row[j] + 1
-            substitutions = previous_row[j] + (c1 != c2)
-            current_row.append(min(insertions, deletions, substitutions))
-        previous_row = current_row
-    return previous_row[-1]
+def shannon_entropy(text: str) -> float:
+    cleaned = re.sub(r"\s+", "", text.lower())
+    if not cleaned:
+        return 0.0
+    counts = Counter(cleaned)
+    length = len(cleaned)
+    return -sum((count / length) * math.log2(count / length) for count in counts.values())
 
+def analyze_phonology(words):
+    total_letters = 0
+    consonant_count = 0
+    cluster_words = []
 
-def extract_consonant_skeleton(word: str) -> str:
-    """Извлекает согласный скелет слова для оценки консонанса."""
-    return "".join(ch for ch in word.lower() if ch in CONSONANTS)
+    for word in words:
+        letters = [ch for ch in word if ch in VOWELS or ch in CONSONANTS]
+        total_letters += len(letters)
+        consonant_count += sum(1 for ch in letters if ch in CONSONANTS)
 
+        # Поиск кластеров из 3 и более согласных подряд
+        streak = 0
+        has_cluster = False
+        for ch in letters:
+            if ch in CONSONANTS:
+                streak += 1
+                if streak >= 3:
+                    has_cluster = True
+            else:
+                streak = 0
+        if has_cluster:
+            cluster_words.append(word)
 
-def simple_russian_stem(word: str) -> str:
-    """Базовый стеммер без зависимостей для выделения корневой основы."""
-    w = word.lower()
-    if len(w) <= 4:
-        return w
-    w = re.sub(
-        r"(ющими|ющимися|ащими|ящими|вшими|ыми|ими|ого|его|ому|ему|ами|ями|ах|ях|ой|ей|ом|ем|ую|юю|ая|яя|ое|ее|ые|ие|ть|ти|ся|сь)$",
-        "",
-        w,
-    )
-    return w if len(w) >= 3 else word.lower()
+    consonant_ratio = (consonant_count / total_letters) if total_letters else 0.0
+    cluster_density = (len(cluster_words) / len(words)) if words else 0.0
+    return consonant_ratio, cluster_density, cluster_words
 
+def check_authenticity(text: str, ttr: float, entropy: float, cluster_density: float):
+    lower_text = text.lower()
+    found_cliches = []
+    for pattern in CLICHE_PATTERNS:
+        matches = re.findall(pattern, lower_text)
+        if matches:
+            found_cliches.append(pattern)
 
-def analyze_khakimullin_method(text: str) -> dict:
-    """
-    Комплексный анализ текста по 13-метрической архитектуре Метода Хакимуллина.
-    Zero-dependency Python NLP Analyzer v2.0.
-    """
-    clean_text = text.strip()
-    if not clean_text:
-        return {"error": "Empty text provided"}
+    # Расчет индекса аутентичности (0-100)
+    score = 50.0
+    score += min(ttr * 30.0, 30.0)             # Вклад лексического разнообразия
+    score += min(max(entropy - 3.5, 0) * 10, 12.0)  # Вклад информационной энтропии
+    score += min(cluster_density * 100, 8.0)   # Вклад фонетического сопротивления
+    score -= len(found_cliches) * 15.0         # Штраф за обнаруженные клише
+    score = max(0.0, min(100.0, score))
 
-    lines = [line.strip() for line in clean_text.splitlines() if line.strip()]
-    sentences = [s.strip() for s in re.split(r"[\.\!\?]+", clean_text) if s.strip()]
-    words = re.findall(r"[а-яё]+", clean_text.lower())
+    return round(score, 1), found_cliches
 
-    if not words:
-        return {"error": "No Cyrillic words found"}
+def generate_report(text: str, title: str = "Без названия", mode: str = "Universal (Syllabo-Tonic / Tonic / Prose)"):
+    words = tokenize(text)
+    total_words = len(words)
+    unique_words = len(set(words))
+    ttr = (unique_words / total_words) if total_words else 0.0
+    entropy = shannon_entropy(text)
+    cons_ratio, cluster_density, cluster_words = analyze_phonology(words)
+    auth_score, cliches = check_authenticity(text, ttr, entropy, cluster_density)
 
-    # =========================================================================
-    # БАЗОВЫЕ КОЛИЧЕСТВЕННЫЕ МЕТРИКИ (v1.0 Core)
-    # =========================================================================
-    char_counts = Counter(clean_text.lower())
-    total_chars = len(clean_text)
-    shannon_entropy = round(
-        -sum((count / total_chars) * math.log2(count / total_chars) for count in char_counts.values()),
-        3,
-    )
-
-    unique_words = set(words)
-    ttr = round(len(unique_words) / len(words), 3)
-
-    letters_only = [ch for ch in clean_text.lower() if ch in VOWELS or ch in CONSONANTS]
-    consonant_count = sum(1 for ch in letters_only if ch in CONSONANTS)
-    consonant_ratio = round(consonant_count / max(1, len(letters_only)), 3)
-
-    cluster_pattern = re.compile(r"[бвгджзйклмнпрстфхцчшщ]{3,}")
-    words_with_clusters = sum(1 for w in words if cluster_pattern.search(w))
-    cluster_density = round(words_with_clusters / len(words), 3)
-
-    # =========================================================================
-    # УРОВЕНЬ I: ФОНОЛОГИЧЕСКАЯ МАТРИЦА (Tier I)
-    # =========================================================================
-    alliterated_lines = 0
-    for line in lines:
-        line_words = re.findall(r"[а-яё]+", line.lower())
-        if len(line_words) >= 2:
-            line_cons = []
-            for w in line_words:
-                line_cons.extend(set(ch for ch in w if ch in CONSONANTS))
-            counts = Counter(line_cons)
-            if counts and counts.most_common(1)[0][1] >= min(3, len(line_words)):
-                alliterated_lines += 1
-    horizontal_alliteration = round(alliterated_lines / max(1, len(lines)), 3)
-
-    skeletons = [extract_consonant_skeleton(w) for w in words]
-    valid_skeletons = [s for s in skeletons if len(s) >= 2]
-    skel_counts = Counter(valid_skeletons)
-    consonance_matches = sum(1 for s in valid_skeletons if skel_counts[s] > 1)
-    consonance_density = round(consonance_matches / max(1, len(valid_skeletons)), 3)
-
-    long_words = list(dict.fromkeys(w for w in words if len(w) >= 4))
-    paronym_pairs = []
-    for i in range(len(long_words)):
-        for j in range(i + 1, len(long_words)):
-            w1, w2 = long_words[i], long_words[j]
-            if abs(len(w1) - len(w2)) <= 2:
-                dist = levenshtein(w1, w2)
-                if 1 <= dist <= 2 and w1[:2] == w2[:2]:
-                    paronym_pairs.append(f"{w1}-{w2}")
-    paronym_index = round(len(paronym_pairs) / max(1, len(long_words)), 3)
-
-    # =========================================================================
-    # УРОВЕНЬ II: РИТМИКО-МЕТРИЧЕСКИЙ ДВИГАТЕЛЬ (Tier II)
-    # =========================================================================
-    syllables_per_line = [sum(1 for ch in line.lower() if ch in VOWELS) for line in lines]
-    mean_syl = sum(syllables_per_line) / max(1, len(syllables_per_line))
-    variance_syl = sum((x - mean_syl) ** 2 for x in syllables_per_line) / max(1, len(syllables_per_line))
-    cv_rhythm = round(math.sqrt(variance_syl) / max(0.1, mean_syl), 3)
-
-    internal_breaks = sum(
-        len(re.findall(r"(?<=\w)[\.\!\?]\s+(?=[А-ЯЁ])|\s+[-—]\s*$|[-—]\s+", line))
-        for line in lines
-    )
-    syncopation_score = round(cv_rhythm + (internal_breaks / max(1, len(lines))), 3)
-
-    # =========================================================================
-    # УРОВЕНЬ III: СЕМАНТИЧЕСКАЯ ГЕОМЕТРИЯ И ПРОЗА (Tier III)
-    # =========================================================================
-    content_words = [w for w in words if w not in STOPWORDS and len(w) >= 3]
-    stems = [simple_russian_stem(w) for w in content_words]
-    stem_positions = {}
-    for idx, st in enumerate(stems):
-        stem_positions.setdefault(st, []).append(idx)
-
-    distant_loops = sum(
-        1 for positions in stem_positions.values()
-        if len(positions) >= 2 and (positions[-1] - positions[0]) >= 5
-    )
-    distant_repetition_index = round(distant_loops / max(1, len(set(stems))), 3)
-
-    hard_count = sum(1 for ch in letters_only if ch in EXPLOSIVES_HISSING)
-    soft_count = sum(1 for ch in letters_only if ch in SONORANTS)
-    phonosemantic_tension = round(hard_count / max(1, hard_count + soft_count), 3)
-
-    complex_words = [w for w in content_words if len(w) >= 8]
-    defamiliarization_density = round(
-        (len(complex_words) / max(1, len(content_words))) * (len(content_words) / max(1, len(words))),
-        3,
-    )
-
-    sent_lengths = [len(re.findall(r"[а-яё]+", s.lower())) for s in sentences]
-    if len(sent_lengths) > 1:
-        mean_len = sum(sent_lengths) / len(sent_lengths)
-        var_len = sum((x - mean_len) ** 2 for x in sent_lengths) / len(sent_lengths)
-        prose_accent_pulse = round(math.sqrt(var_len) / max(0.1, mean_len), 3)
-    else:
-        prose_accent_pulse = 0.0
-
-    # =========================================================================
-    # ИНТЕГРАЛЬНЫЙ ИНДЕКС МЕТОДА ХАКИМУЛЛИНА (K-Index)
-    # =========================================================================
-    k_index = round(
-        (
-            (shannon_entropy / 5.0) * 1.5
-            + ttr * 1.5
-            + cluster_density * 2.0
-            + horizontal_alliteration
-            + consonance_density
-            + paronym_index * 1.5
-            + min(1.0, syncopation_score)
-            + distant_repetition_index * 1.5
-            + phonosemantic_tension
-            + defamiliarization_density * 2.0
-            + min(1.0, prose_accent_pulse)
-        )
-        / 10.0,
-        3,
-    )
-
-    return {
-        "core_metrics": {
-            "shannon_entropy": shannon_entropy,
-            "ttr_lexical_diversity": ttr,
-            "consonant_ratio": consonant_ratio,
-            "consonant_cluster_density": cluster_density,
-        },
-        "tier_1_phonology": {
-            "horizontal_alliteration": horizontal_alliteration,
-            "consonance_density": consonance_density,
-            "paronymic_attraction_index": paronym_index,
-            "paronym_pairs": paronym_pairs[:5],
-        },
-        "tier_2_rhythm": {
-            "rhythmic_cv": cv_rhythm,
-            "syncopation_score": syncopation_score,
-        },
-        "tier_3_semantics": {
-            "distant_semantic_loops": distant_loops,
-            "distant_repetition_index": distant_repetition_index,
-            "phonosemantic_tension": phonosemantic_tension,
-            "defamiliarization_density": defamiliarization_density,
-            "prose_accent_pulse": prose_accent_pulse,
-        },
-        "K_INDEX_TOTAL": k_index,
-    }
-
-
-def print_report(results: dict) -> None:
-    """Форматированный вывод отчёта в консоль."""
-    if "error" in results:
-        print(f"Ошибка: {results['error']}")
-        return
-
-    print("=" * 60)
-    print("THE KHAKIMULLIN METHOD (МЕТОД ХАКИМУЛЛИНА) — NLP AUDIT v2.0")
-    print("=" * 60)
-
-    sections = [
-        ("БАЗОВЫЕ МЕТРИКИ (CORE)", results["core_metrics"]),
-        ("УРОВЕНЬ I: ФОНОЛОГИЧЕСКАЯ МАТРИЦА", results["tier_1_phonology"]),
-        ("УРОВЕНЬ II: РИТМИКО-МЕТРИЧЕСКИЙ ДВИГАТЕЛЬ", results["tier_2_rhythm"]),
-        ("УРОВЕНЬ III: СЕМАНТИЧЕСКАЯ ГЕОМЕТРИЯ", results["tier_3_semantics"]),
-    ]
-
-    for title, data in sections:
-        print(f"\n[{title}]")
-        for key, val in data.items():
-            print(f"  {key:<30}: {val}")
-
-    print("\n" + "=" * 60)
-    print(f"ИТОГОВЫЙ ИНДЕКС ПЛОТНОСТИ (K-INDEX): {results['K_INDEX_TOTAL']}")
-    print("=" * 60)
-
+    print("=" * 64)
+    print("АНАЛИТИЧЕСКИЙ ОТЧЁТ (МЕТОД ХАКИМУЛЛИНА v1.2)")
+    print("=" * 64)
+    print(f"Объект анализа : {title}")
+    print(f"Режим анализа  : {mode}")
+    print("-" * 64)
+    print("1. КОЛИЧЕСТВЕННЫЕ И ФОНОЛОГИЧЕСКИЕ ПОКАЗАТЕЛИ")
+    print(f"   • Всего слов (Total Words)           : {total_words}")
+    print(f"   • Уникальных слов (Unique Words)     : {unique_words}")
+    print(f"   • Лексическое разнообразие (TTR)     : {ttr:.4f} ({ttr*100:.1f}%)")
+    print(f"   • Энтропия Шеннона (Shannon Entropy) : {entropy:.4f} bits/char")
+    print(f"   • Доля согласных (Consonant Ratio)   : {cons_ratio:.4f} ({cons_ratio*100:.1f}%)")
+    print(f"   • Плотность кластеров (3+ согласных) : {cluster_density:.4f} ({cluster_density*100:.2f}%)")
+    if cluster_words:
+        print(f"   • Слова с кластерами                 : {', '.join(cluster_words)}")
+    print("-" * 64)
+    print("2. ДИАГНОСТИКА АУТЕНТИЧНОСТИ И КЛИШЕ")
+    print(f"   • Обнаружено клише и штампов         : {len(cliches)}")
+    print(f"   • Итоговый индекс аутентичности      : {auth_score} / 100")
+    print("=" * 64)
 
 if __name__ == "__main__":
     sample_text = """
-В шелесте своей орбиты -
-Сахар,
-Случайно
-Столкнулся с другой галактикой
-Сияющим гало.
-
-Градинками
-Тростника Кубы
-Из ложки стальной зажатой
+    Мысли торжественней ночью,
+    Есть у них дар спасения.
+    Только проблема вот в чём:
+    Отключено отопление.
+    """
+    generate_report(sample_text, title="Тестовый фрагмент (Силлабо-тоника)")
