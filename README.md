@@ -41,6 +41,14 @@
 * **Уровень I (Фонологическая матрица):** горизонтальная аллитерация, консонанс, консонантные кластеры, семантизация фонологического уровня, паронимическая аттракция.
 * **Уровень II (Ритмико-метрический двигатель):** тоническое стихосложение, дольник и тактовик с переменным межиктовым интервалом, ритмическая и графическая синкопа.
 * **Уровень III (Семантическая геометрия):** дистантный семантический повтор, рифмовка концептов, остранение, фоносемантика, инструментовка прозы по законам акцентного стиха.
+## Comparative Advantage / Сравнение с аналогами
+
+| Criterion / Критерий | Classical Philology & Close Reading | Standard NLP & Stylometry | **The Khakimullin Method** |
+| :--- | :--- | :--- | :--- |
+| **Primary Goal / Цель** | Passive historical description & interpretation | Dry word-frequency statistics (TF-IDF, sentiment) | **Active text engineering** & cognitive engagement |
+| **Scope / Охват** | Phonetics, rhythm & semantics studied separately | Ignores Russian tonic rhythm & consonant clusters | **Unified 3-tier matrix** (13 metrics in one system) |
+| **Genre Flexibility / Жанры** | Strict split between verse theory and prose | Tuned mostly for standard syllabo-tonic meter | **Cross-genre**: poetry, high-density prose & game narrative |
+| **Tech Stack / Инструментарий** | No executable code | Heavy external libraries & GPU dependencies | **Zero-dependency Python** (`analyzer.py`) — runs anywhere |
 
 ---
 
